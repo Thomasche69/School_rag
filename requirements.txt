@@ -1,0 +1,8 @@
+streamlit
+langchain_community
+pdfplumber
+langchain_text_splitters
+langchain_core
+langchain_ollama
+requests
+typing
