@@ -89,7 +89,8 @@ with st.sidebar:
     """)
 PDF_STORAGE_PATH = 'document_store/'
 OLLAMA_SERVER_URL = "http://127.0.0.1:8080"
-MAX_FILE_SIZE_MB = 50
+MAX_FILE_SIZE_MB = 5
+uploaded = False
 
 os.makedirs(PDF_STORAGE_PATH, exist_ok=True)
 
@@ -216,6 +217,7 @@ if uploaded_pdf:
         raw_docs = load_pdf_documents(saved_path)
         processed_chunks = chunk_documents(raw_docs)
         index_documents(processed_chunks)
+        uploaded = True
         st.success("✅ Document processed successfully! Ask your questions below.")
 
 
@@ -263,16 +265,21 @@ with chat_container:
 user_input = st.chat_input("Enter your question about the document...")
 
 if user_input:
-    # Append user input to the message log
-    st.session_state.message_log.append({"role": "user", "content": user_input})
+    # Check if any documents have been indexed
+    if not uploaded:
+       st.error("❌ Please upload and process a PDF before asking questions.")
+    else:
+    # ...rest of your code...
+        # Append user input to the message log
+        st.session_state.message_log.append({"role": "user", "content": user_input})
 
-    with st.spinner("🧠 Thinking..."):
-       relevant_docs = find_related_documents(user_input)
-       prompt_chain = build_prompt_chain(user_input, relevant_docs)
-       ai_response = generate_ai_response(prompt_chain, selected_model)  # Pass the selected model
+        with st.spinner("🧠 Thinking..."):
+            relevant_docs = find_related_documents(user_input)
+            prompt_chain = build_prompt_chain(user_input, relevant_docs)
+            ai_response = generate_ai_response(prompt_chain, selected_model)  # Pass the selected model
 
-    # Append AI response to the message log
-    st.session_state.message_log.append({"role": "ai", "content": ai_response})
+        # Append AI response to the message log
+        st.session_state.message_log.append({"role": "ai", "content": ai_response})
 
-    # Rerun the app to update the chat UI
-    st.rerun()
+        # Rerun the app to update the chat UI
+        st.rerun()
