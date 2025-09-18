@@ -3,19 +3,17 @@ import os
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.documents import Document
 from typing import List
 from langchain_core.embeddings import Embeddings
-from langchain_ollama import OllamaEmbeddings
 from langchain_core.prompts import (
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
     AIMessagePromptTemplate,
     ChatPromptTemplate
 )
+import pdfplumber
 import requests
-
+import re
 
 
 st.markdown("""
@@ -89,7 +87,7 @@ with st.sidebar:
     """)
 PDF_STORAGE_PATH = 'document_store/'
 OLLAMA_SERVER_URL = "http://127.0.0.1:8080"
-MAX_FILE_SIZE_MB = 5
+MAX_PDF_PAGES = 20  # Set your desired page limit
 uploaded = False
 
 os.makedirs(PDF_STORAGE_PATH, exist_ok=True)
@@ -210,10 +208,14 @@ uploaded_pdf = st.file_uploader("Upload Research Document (PDF)",
                                 accept_multiple_files=False)
 
 if uploaded_pdf:
-    if uploaded_pdf.size > MAX_FILE_SIZE_MB * 1024 * 1024:
-        st.error(f"❌ File size exceeds {MAX_FILE_SIZE_MB} MB. Please upload a smaller file.")
+    # Save the file temporarily to check pages
+    saved_path = save_uploaded_file(uploaded_pdf)
+    with pdfplumber.open(saved_path) as pdf:
+        num_pages = len(pdf.pages)
+    if num_pages > MAX_PDF_PAGES:
+        st.error(f"❌ PDF has {num_pages} pages. Please upload a PDF with {MAX_PDF_PAGES} pages or fewer.")
+        os.remove(saved_path)  # Optionally remove the file if too large
     else:
-        saved_path = save_uploaded_file(uploaded_pdf)
         raw_docs = load_pdf_documents(saved_path)
         processed_chunks = chunk_documents(raw_docs)
         index_documents(processed_chunks)
@@ -223,33 +225,40 @@ if uploaded_pdf:
 
 if "message_log" not in st.session_state:
     st.session_state.message_log = [{"role": "ai", "content": "Hi! I'm your AI assistant. How can I help you today?"}]
-def render_response_with_math(content):
+def render_response_with_math_and_thinking(content):
     """
-    Parses the LLM response and renders text and LaTeX math expressions separately.
+    Renders LLM response, displaying <think>...</think> text in a lighter color,
+    and LaTeX math expressions as equations.
     """
-    import re
 
-    # Regex to find LaTeX math expressions enclosed in \( ... \) or \[ ... \]
-    math_pattern = re.compile(r"\\\((.*?)\\\)|\\\[(.*?)\\\]")
+    # Split content into segments: <think>, LaTeX, and normal text
+    pattern = re.compile(
+        r"(<think>.*?</think>)|"
+        r"(\\\((.*?)\\\))|"
+        r"(\\\[(.*?)\\\])",
+        re.DOTALL
+    )
 
-    # Check if the content contains any LaTeX math expressions
-    if not math_pattern.search(content):
-        # If no math expressions are found, render the content as plain text
-        st.markdown(content)
-        return
-
-    # Split the content into text and math parts
-    parts = math_pattern.split(content)
-
-    for part in parts:
-        if part is None:
-            continue
-        if math_pattern.match(f"\\({part}\\)") or math_pattern.match(f"\\[{part}\\]"):
-            # Render as LaTeX
-            st.latex(part.strip())
-        else:
-            # Render as regular text
-            st.markdown(part.strip())
+    pos = 0
+    for match in pattern.finditer(content):
+        start, end = match.span()
+        # Render any normal text before this match
+        if start > pos:
+            st.markdown(content[pos:start], unsafe_allow_html=True)
+        if match.group(1):  # <think>...</think>
+            inner = match.group(1)[7:-8]  # Remove <think> and </think>
+            st.markdown(
+                f'<span style="color:#bbbbbb;font-style:italic;">{inner}</span>',
+                unsafe_allow_html=True
+            )
+        elif match.group(2):  # \( ... \)
+            st.latex(match.group(3).strip())
+        elif match.group(4):  # \[ ... \]
+            st.latex(match.group(5).strip())
+        pos = end
+    # Render any remaining text after the last match
+    if pos < len(content):
+        st.markdown(content[pos:], unsafe_allow_html=True)
 
 # Chat container to display messages
 chat_container = st.container()
@@ -257,7 +266,7 @@ with chat_container:
     for message in st.session_state.message_log:
         with st.chat_message(message["role"]):
             if message["role"] == "ai":
-                render_response_with_math(message["content"])  # Render AI messages with math support
+                render_response_with_math_and_thinking(message["content"])  # Render AI messages with math support
             else:
                 st.markdown(message["content"])  # Render user messages as plain text
 
