@@ -13,10 +13,10 @@ def get_llm(model_name):
         MODEL_CACHE[model_name] = OllamaLLM(model=model_name)
     return MODEL_CACHE[model_name]
 
-def get_embedding(model_name):
-    if model_name not in EMBEDDING_CACHE:
-        EMBEDDING_CACHE[model_name] = OllamaEmbeddings(model=model_name)
-    return EMBEDDING_CACHE[model_name]
+def get_embedding():
+    if "nomic-embed-text" not in EMBEDDING_CACHE:
+        EMBEDDING_CACHE["nomic-embed-text"] = OllamaEmbeddings(model="nomic-embed-text")
+    return EMBEDDING_CACHE["nomic-embed-text"]
 
 @app.route('/ollama', methods=['POST'])
 def aiPost():
@@ -48,13 +48,12 @@ def health():
 def embed():
     json_content = request.json
     texts = json_content.get('texts', [])
-    model_name = json_content.get('model_name', DEFAULT_MODEL)
 
     if not texts:
         return jsonify({"error": "No texts provided"}), 400
 
     try:
-        embedding_model = get_embedding(model_name)
+        embedding_model = get_embedding()
         embeddings = embedding_model.embed_documents(texts)
         return jsonify({"embeddings": embeddings})
     except Exception as e:
