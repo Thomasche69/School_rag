@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 MODEL_CACHE = {}
 EMBEDDING_CACHE = {}
-DEFAULT_MODEL = "deepseek-r1:8b"
+DEFAULT_MODEL = "qwen3:8b"
 
 def get_llm(model_name):
     if model_name not in MODEL_CACHE:
@@ -14,9 +14,9 @@ def get_llm(model_name):
     return MODEL_CACHE[model_name]
 
 def get_embedding():
-    if "nomic-embed-text" not in EMBEDDING_CACHE:
-        EMBEDDING_CACHE["nomic-embed-text"] = OllamaEmbeddings(model="nomic-embed-text")
-    return EMBEDDING_CACHE["nomic-embed-text"]
+    if "qwen3-embedding:0.6b" not in EMBEDDING_CACHE:
+        EMBEDDING_CACHE["qwen3-embedding:0.6b"] = OllamaEmbeddings(model="qwen3-embedding:0.6b")
+    return EMBEDDING_CACHE["qwen3-embedding:0.6b"]
 
 @app.route('/ollama', methods=['POST'])
 def aiPost():
