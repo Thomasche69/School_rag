@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
-from langchain_ollama.llms import OllamaLLM
-from langchain_ollama import OllamaEmbeddings
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 app = Flask(__name__)
 
@@ -10,31 +10,45 @@ DEFAULT_MODEL = "qwen3:8b"
 
 def get_llm(model_name):
     if model_name not in MODEL_CACHE:
-        MODEL_CACHE[model_name] = OllamaLLM(model=model_name)
+        MODEL_CACHE[model_name] = ChatOllama(model=model_name)
     return MODEL_CACHE[model_name]
 
 def get_embedding():
-    if "qwen3-embedding:0.6b" not in EMBEDDING_CACHE:
-        EMBEDDING_CACHE["qwen3-embedding:0.6b"] = OllamaEmbeddings(model="qwen3-embedding:0.6b")
-    return EMBEDDING_CACHE["qwen3-embedding:0.6b"]
+    if "qwen3-embedding:8b" not in EMBEDDING_CACHE:
+        EMBEDDING_CACHE["qwen3-embedding:8b"] = OllamaEmbeddings(model="qwen3-embedding:8b")
+    return EMBEDDING_CACHE["qwen3-embedding:8b"]
 
 @app.route('/ollama', methods=['POST'])
 def aiPost():
     print("Received request")
     json_content = request.json
-    query = json_content.get('query', '')
+    messages = json_content.get('messages', [])  # Receive messages array
     model_name = json_content.get('model_name', DEFAULT_MODEL)
 
-    print(f"Query: {query}")
+    print(f"Messages: {messages}")
     print(f"Model: {model_name}")
 
-    if not query:
-        return jsonify({"error": "No query provided"}), 400
+    if not messages:
+        return jsonify({"error": "No messages provided"}), 400
 
     try:
         ollama_model = get_llm(model_name)
-        llm_result = ollama_model.generate([query])
-        response_answer = llm_result.generations[0][0].text
+        langchain_messages = []
+        for msg in messages:
+            role = msg.get("role", "human")
+            content = msg.get("content", "")
+            
+            if role == "system":
+                langchain_messages.append(SystemMessage(content=content))
+            elif role == "ai":
+                langchain_messages.append(AIMessage(content=content))
+            else:  # Default to human for user messages
+                langchain_messages.append(HumanMessage(content=content))
+        
+        # Use invoke for chat models
+        result = ollama_model.invoke(langchain_messages)
+        response_answer = result.content
+        
         return jsonify({"response": response_answer})
     except Exception as e:
         print(f"Error: {e}")
@@ -62,4 +76,4 @@ def embed():
 
 if __name__ == "__main__":
     from waitress import serve
-    serve(app, host="0.0.0.0", port=8080)
+    serve(app, host="0.0.0.0", port=8082)
