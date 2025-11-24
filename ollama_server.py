@@ -14,9 +14,9 @@ def get_llm(model_name):
     return MODEL_CACHE[model_name]
 
 def get_embedding():
-    if "qwen3-embedding:8b" not in EMBEDDING_CACHE:
-        EMBEDDING_CACHE["qwen3-embedding:8b"] = OllamaEmbeddings(model="qwen3-embedding:8b")
-    return EMBEDDING_CACHE["qwen3-embedding:8b"]
+    if "nomic-embed-text:latest" not in EMBEDDING_CACHE:
+        EMBEDDING_CACHE["nomic-embed-text:latest"] = OllamaEmbeddings(model="nomic-embed-text:latest")
+    return EMBEDDING_CACHE["nomic-embed-text:latest"]
 
 @app.route('/ollama', methods=['POST'])
 def aiPost():
